@@ -80,23 +80,29 @@ void print_best_fitness(const individual *generation)
 	printf("%d\n", generation[0].fitness);
 }
 
-void parallel_compute_fitness_function(const sack_object *objects, individual *generation, int object_count, int sack_capacity,int start, int end)
+
+
+
+
+void parallel_compute_fitness_function(const sack_object *objects, individual **generation, int object_count, int sack_capacity,int start, int end)
 {
 	int weight;
 	int profit;
-
-	for (int i = start; i < end; ++i) {
+	int i;
+	int j;
+	individual *gener = *generation;
+	for (i = start; i < end; i++) {
 		weight = 0;
 		profit = 0;
 
-		for (int j = 0; j < generation[i].chromosome_length; ++j) {
-			if (generation[i].chromosomes[j]) {
+		for ( j = 0; j < (gener[i]).chromosome_length; ++j) {
+			if ((gener[i]).chromosomes[j]) {
 				weight += objects[j].weight;
 				profit += objects[j].profit;
 			}
 		}
 
-		generation[i].fitness = (weight <= sack_capacity) ? profit : 0;
+		(gener[i]).fitness = (weight <= sack_capacity) ? profit : 0;
 	}
 }
 
@@ -117,6 +123,87 @@ void compute_fitness_function(const sack_object *objects, individual *generation
 		}
 
 		generation[i].fitness = (weight <= sack_capacity) ? profit : 0;
+	}
+}
+
+int compare(individual a, individual b) {
+	int k;
+	if (a.fitness > b.fitness) {
+		return 1;
+	} else if (a.fitness == b.fitness) {
+		int first_count = 0, second_count = 0;
+
+		for (k = 0; k < a.chromosome_length && k < b.chromosome_length; ++k) {
+			first_count += a.chromosomes[k];
+			second_count += b.chromosomes[k];
+		}
+
+		if ( first_count < second_count) {
+			return 1;
+		} else if (first_count == second_count) {
+			if (a.index < b.index) {
+				return 1;
+			}
+		}
+	}
+	return -1;
+}
+
+
+void merge(individual *source, int start, int mid, int end, individual *destination) {
+	int iA = start;
+	int iB = mid;
+	int i;
+
+
+	for (i = start; i < end; i++) {
+		if (end == iB || (iA < mid && compare(source[iA], source[iB]) == 1 )) {
+			destination[i] = source[iA];
+			iA++;
+		} else {
+			destination[i] = source[iB];
+			iB++;
+		}
+		
+	}
+}
+
+void mergesort(individual *current,int id,int N, int P, pthread_barrier_t *barrier, individual *new) {
+	int i;
+	int start, end;
+	int width;
+	individual *aux;
+	//individual *source  = *current;
+	
+	pthread_barrier_wait(barrier);
+
+	for (width = 1; width < N; width = 2 * width) {
+
+		int merges = ceil((double)N / (2*width));
+		//printf("merges : %d\n",merges);
+		start = id * merges / P * 2 *width;
+    	end = min(((id + 1) * merges/ P * 2 * width), N);
+		//printf("ID: %d  S: %d E: %d\n", id, start,end);
+	
+		for (i = start; i < end; i = i + 2 * width) {
+			merge(current, i,min(i + width,N),min(i + 2 * width, N), new);
+		}
+
+		
+		pthread_barrier_wait(barrier);
+		
+		//if (id == 0) {
+			//printf("NEW %d\n", width);
+			//print_generation(new, N);
+			aux = current;
+			current = new;
+			new = aux;
+			//swapArray(new,*current, N);
+			
+		//}
+		
+		pthread_barrier_wait(barrier);
+		
 	}
 }
 
@@ -231,7 +318,6 @@ void run_genetic_algorithm(const sack_object *objects, int object_count, int gen
 		// compute fitness and sort by it
 		compute_fitness_function(objects, current_generation, object_count, sack_capacity);
 		qsort(current_generation, object_count, sizeof(individual), cmpfunc);
-
 		// keep first 30% children (elite children selection)
 		count = object_count * 3 / 10;
 		for (int i = 0; i < count; ++i) {
