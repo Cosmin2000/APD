@@ -5,6 +5,15 @@
 #include "individual.h"
 #include <stdio.h>
 #include <pthread.h>
+#include <math.h>
+
+
+
+int compare(individual a, individual b) ;
+
+void merge(individual *source, int start, int mid, int end, individual *destination);
+
+void mergesort(individual *current,int id,int N, int P, pthread_barrier_t *barrier, individual *new);
 
 //minin between 2 numbers
 int min (int a, int b);
@@ -21,7 +30,7 @@ void print_generation(const individual *generation, int limit);
 void print_best_fitness(const individual *generation);
 
 // Parallel computes the fitness function for each individual in a generation
-void parallel_compute_fitness_function(const sack_object *objects, individual *generation, int object_count, int sack_capacity,int start, int end);
+void parallel_compute_fitness_function(const sack_object *objects, individual **generation, int object_count, int sack_capacity,int start, int end);
 
 // computes the fitness function for each individual in a generation
 void compute_fitness_function(const sack_object *objects, individual *generation, int object_count, int sack_capacity);
