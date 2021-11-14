@@ -4,7 +4,6 @@
 build:
 	@echo "Building..."
 	@gcc -o tema1_par tema1_par.c parallel_genetic_algorithm.c -lm  -lpthread -Wall 
-	@gcc -o tema1 tema1.c genetic_algorithm.c -lm -Wall -Werror
 	@echo "Done"
 
 build_debug:
@@ -14,5 +13,5 @@ build_debug:
 
 clean:
 	@echo "Cleaning..."
-	@rm -rf tema1 tema1_par
+	@rm -rf tema1_par
 	@echo "Done"

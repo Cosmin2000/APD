@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "genetic_algorithm.h"
+#include "parallel_genetic_algorithm.h"
 
 
 int min (int a, int b) {
@@ -80,10 +80,6 @@ void print_best_fitness(const individual *generation)
 	printf("%d\n", generation[0].fitness);
 }
 
-
-
-
-
 void parallel_compute_fitness_function(const sack_object *objects, individual **generation, int object_count, int sack_capacity,int start, int end)
 {
 	int weight;
@@ -103,26 +99,6 @@ void parallel_compute_fitness_function(const sack_object *objects, individual **
 		}
 
 		(gener[i]).fitness = (weight <= sack_capacity) ? profit : 0;
-	}
-}
-
-void compute_fitness_function(const sack_object *objects, individual *generation, int object_count, int sack_capacity)
-{
-	int weight;
-	int profit;
-
-	for (int i = 0; i < object_count; ++i) {
-		weight = 0;
-		profit = 0;
-
-		for (int j = 0; j < generation[i].chromosome_length; ++j) {
-			if (generation[i].chromosomes[j]) {
-				weight += objects[j].weight;
-				profit += objects[j].profit;
-			}
-		}
-
-		generation[i].fitness = (weight <= sack_capacity) ? profit : 0;
 	}
 }
 
@@ -149,18 +125,18 @@ int compare(individual a, individual b) {
 	return -1;
 }
 
-
 void merge(individual *source, int start, int mid, int end, individual *destination) {
-	int iA = start;
-	int iB = mid;
+	int iA = start; // start-ul primului sub-array
+	int iB = mid; // start-ul celui de-al doilea sub-array
 	int i;
 
-
 	for (i = start; i < end; i++) {
+		// Daca am terminat al doilea sub-array sau trebuie ales elementul din primul sub-array
 		if (end == iB || (iA < mid && compare(source[iA], source[iB]) == 1 )) {
 			destination[i] = source[iA];
 			iA++;
 		} else {
+			// este ales elementul din al doilea sub-array
 			destination[i] = source[iB];
 			iB++;
 		}
@@ -168,75 +144,57 @@ void merge(individual *source, int start, int mid, int end, individual *destinat
 	}
 }
 
-void mergesort(individual *current,int id,int N, int P, pthread_barrier_t *barrier, individual *new) {
-	int i;
+void parallel_mergesort(individual *current,int id,int N, int P, pthread_barrier_t *barrier, individual *new) {
+	int i, merges;
 	int start, end;
 	int width;
-	individual *aux = calloc(N , sizeof(individual));
-	//individual *source  = *current;
+	
+	// folosit pentru interschimbare
+	individual *aux;
+
+	if (id == 0) {
+		aux = calloc(N , sizeof(individual));
+	}
 	
 	pthread_barrier_wait(barrier);
 
+	
 	for (width = 1; width < N; width = 2 * width) {
 
-		int merges = ceil((double)N / (2*width));
-		//printf("merges : %d\n",merges);
+		// Pentru ca mergesort-ul sa mearga pentru orice dimensiune, daca este cazul, fac un merge in plus. 
+		// Folosesc functia ceil pentru asta.
+		merges = ceil((double)N / (2*width));
+		//Paralelizez merge-urile.
 		start = id * merges / P * 2 *width;
     	end = min(((id + 1) * merges/ P * 2 * width), N);
-		//printf("ID: %d  S: %d E: %d\n", id, start,end);
 	
 		for (i = start; i < end; i = i + 2 * width) {
 			merge(current, i,min(i + width,N),min(i + 2 * width, N), new);
 		}
-
 		
+		// Astept sa termine toate thread-urile
 		pthread_barrier_wait(barrier);
 		
-		if (id == 0) {
-			//printf("NEW %d\n", width);
-			//print_generation(new, N);
+		if (id == 0) {	
+			// Updatez generatia. Folosesc memmove fiindca cu interschimbare simpla cu pointeri, 
+			// current si new  pointeaza acceasi zona de memorie.	
 			memmove(aux,current, N * sizeof(individual));
 			memmove(current,new, N * sizeof(individual));
-			memmove(new,aux, N * sizeof(individual));
-			//free(aux);
-			// aux = current;
-			// current = new;
-			// new = aux;
-			//swapArray(new,*current, N);
-			
+			memmove(new,aux, N * sizeof(individual));			
 		}
 		
 		pthread_barrier_wait(barrier);
+		// Dupa ce toate thread-urile au terminat pot porni urmatorul nivel de merge-uri.
 		
 	}
+
 	if (id == 0) {
+		// Dezaloc vectorul alocat pentru interschimbare.
 		free(aux);
 	}
 }
 
-int cmpfunc(const void *a, const void *b)
-{
-	int i;
-	individual *first = (individual *) a;
-	individual *second = (individual *) b;
 
-	int res = second->fitness - first->fitness; // decreasing by fitness
-	if (res == 0) {
-		int first_count = 0, second_count = 0;
-
-		for (i = 0; i < first->chromosome_length && i < second->chromosome_length; ++i) {
-			first_count += first->chromosomes[i];
-			second_count += second->chromosomes[i];
-		}
-
-		res = first_count - second_count; // increasing by number of objects in the sack
-		if (res == 0) {
-			return second->index - first->index;
-		}
-	}
-
-	return res;
-}
 
 void mutate_bit_string_1(const individual *ind, int generation_index)
 {
@@ -297,93 +255,3 @@ void free_generation(individual *generation)
 	}
 }
 
-void run_genetic_algorithm(const sack_object *objects, int object_count, int generations_count, int sack_capacity)
-{
-	int count, cursor;
-	individual *current_generation = (individual*) calloc(object_count, sizeof(individual));
-	individual *next_generation = (individual*) calloc(object_count, sizeof(individual));
-	individual *tmp = NULL;
-
-	// set initial generation (composed of object_count individuals with a single item in the sack)
-	for (int i = 0; i < object_count; ++i) {
-		current_generation[i].fitness = 0;
-		current_generation[i].chromosomes = (int*) calloc(object_count, sizeof(int));
-		current_generation[i].chromosomes[i] = 1;
-		current_generation[i].index = i;
-		current_generation[i].chromosome_length = object_count;
-
-		next_generation[i].fitness = 0;
-		next_generation[i].chromosomes = (int*) calloc(object_count, sizeof(int));
-		next_generation[i].index = i;
-		next_generation[i].chromosome_length = object_count;
-	}
-
-	// iterate for each generation
-	for (int k = 0; k < generations_count; ++k) {
-		cursor = 0;
-
-		// compute fitness and sort by it
-		compute_fitness_function(objects, current_generation, object_count, sack_capacity);
-		qsort(current_generation, object_count, sizeof(individual), cmpfunc);
-		// keep first 30% children (elite children selection)
-		count = object_count * 3 / 10;
-		for (int i = 0; i < count; ++i) {
-			copy_individual(current_generation + i, next_generation + i);
-		}
-		cursor = count;
-
-		// mutate first 20% children with the first version of bit string mutation
-		count = object_count * 2 / 10;
-		for (int i = 0; i < count; ++i) {
-			copy_individual(current_generation + i, next_generation + cursor + i);
-			mutate_bit_string_1(next_generation + cursor + i, k);
-		}
-		cursor += count;
-
-		// mutate next 20% children with the second version of bit string mutation
-		count = object_count * 2 / 10;
-		for (int i = 0; i < count; ++i) {
-			copy_individual(current_generation + i + count, next_generation + cursor + i);
-			mutate_bit_string_2(next_generation + cursor + i, k);
-		}
-		cursor += count;
-
-		// crossover first 30% parents with one-point crossover
-		// (if there is an odd number of parents, the last one is kept as such)
-		count = object_count * 3 / 10;
-
-		if (count % 2 == 1) {
-			copy_individual(current_generation + object_count - 1, next_generation + cursor + count - 1);
-			count--;
-		}
-
-		for (int i = 0; i < count; i += 2) {
-			crossover(current_generation + i, next_generation + cursor + i, k);
-		}
-
-		// switch to new generation
-		tmp = current_generation;
-		current_generation = next_generation;
-		next_generation = tmp;
-
-		for (int i = 0; i < object_count; ++i) {
-			current_generation[i].index = i;
-		}
-
-		if (k % 5 == 0) {
-			print_best_fitness(current_generation);
-		}
-	}
-
-	compute_fitness_function(objects, current_generation, object_count, sack_capacity);
-	qsort(current_generation, object_count, sizeof(individual), cmpfunc);
-	print_best_fitness(current_generation);
-
-	// free resources for old generation
-	free_generation(current_generation);
-	free_generation(next_generation);
-
-	// free resources
-	free(current_generation);
-	free(next_generation);
-}

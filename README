@@ -1,11 +1,59 @@
-aaaaaaaaa
-sadasdhashdasdcgjasgdcgasdcgacsgjdjgasgjdcgasdas'
-d
-as
-das
-d
-cas
-dc
-as
-cds
-dassadasdasdasdasdasd
+Grigore Cosmin Mitica
+332CC
+
+                               ALGORITMI PARALELI SI DISTRIBUITI
+                        Tema 1 - Paralelizarea unui algoritm genetici
+
+Implementare:
+    Pornesc prin a citi input-ul folosind functia data in schelet pe care o modific putin 
+(mai astept un argument in plus) pentru a mai primi ca parametru si numarul de thread-uri.
+    Pentru a transmite argumente thread-urilor definesc o structura "thread_arg". Aceast contine:
+id-ul thread-ului, numarul de thread-uri, obiectele, numarul de obiecte, numarul de generatii, capacitatea
+rucsacului, un array folosit pentru mergesort ("new"), generatia curenta, generatia viitoare, si doua bariere
+pentru sincronizarea transformarilor generatiilor si sincronizarea etapelor de mergesort.
+    Apoi, pentru fiecare thread completez argumentele (fac un array de structuri, o structura per thread), il creez
+cu pthread_create dandu-i sa execute functia "thread_func" si ii fac join (cu pthread_join).
+    In functia executata de fiecare thread ("thread_func") extrag prima data argumentele. Cu ajutorul indiciilor
+paralelizez crearea generatiei initiale (ma folosesc de formulele din laborator).
+    Pornesc apoi iteratiile pentru a obtine numarul de generatii dat. Astfel, pentru fiecare generatie fac urmatoarele
+operatii:
+    Initializez cursorul(indica unde ma aflu in generatia viitoare) cu 0.
+    Paralelizez calcularea fitness-ului fiecarui individ din generatia curenta folosindu-ma de indici 
+(functia parallel_compute_fitness_function care primeste in plus ca parametrii si indicii de start si end)
+    Pentru sincronizarea algoritmului ma folosesc de mecanismul de bariera.
+    Sortez paralel indivizii descrescator dupa valoarea de fitness sau crescator dupa numarul de indivizi sau index
+Ma folosesc de mergesort-ul din laborator pe care il adaptez pentru a functiona pentru orice dimensiune. 
+    Fac apoi selectia elitei paralelizand cu ajutorul indiciilor de start si de final.
+    Aplic prima varianta de mutatie (functia mutate_bit_string_1) pentru primii 20% din indivizi din generatie intr-un mod 
+paralel, folosindu-ma de indici, modificand si cursorul in acelasi timp.
+    Aplic a doua varianta de mutatie (functia mutate_bit_string_2) pe primii 20% din indivizii in mod paralel, folosindu-ma
+tot de indici. Cresc iarasi cursorul.
+    Aplic crossover intr-un punct pe primii 30% din indivizii din generatie, insa, inainte verific daca numarul de parinti
+este impar, iar daca este, pastrez ultimul individ din generatie (operatie facuta doar de thread-ul 0).
+    Paralelizez operatia de crossover folosindu-ma tot de indicii, insa daca indicele de start este impar,
+decrementez indicele de sfarsit pentru ca index-ul sa nu-mi depaseasca array-ul (index out of bounds).
+    Interschimb apoi generatia curenta cu cea viitoare, operatie facuta de un singur thread.
+    Pentru noua generatie curenta, ii setez corect index-ul(in mod paralel, folosind indicii), ii recalculez 
+fitness-ul (paralel folosind indicii) si o sortez paralel folosind mergesort.
+    Trec apoi la urmatoarea generatie si aplic acelasi algoritm.
+    Dupa ce fiecare thread isi termina task-ul, distrug barierele si dezaloc memoria.
+
+Observatii:
+    Pentru sincronizare ma folosesc de mecanismul bariera. Pentru sincronizarea algoritmului folosesc o bariera, iar pentru
+mergesort folosesc alta bariera.
+    Cand ma refer la paralelizarea prin indicii ma refer la paralelizarea unei bucle in care pentru fiecare thread calculez
+indicii de start si de final folosind formulele din laborator.
+    Mergesort-ul paralelizat este adaptat dupa cel din laborator facandu-l sa functioneze pentru orice dimensiune.
+Pentru asta, am mai facut o interclasare in plus la nevoie (cand am calculat numarul de merges in functia "mergesort" am
+folosit functia "ceil" care rotunjeste prin adaos.
+    Variabilele cursor si count nu sunt partajate deoarece au aceeasi valoare pentru toate thread-urile, iar daca le partajam trebuia
+sa asigur si pentru acestea sincronizarea. Pe acestea le modific cand fac operatii de completare a generatiei viitoare (dupa selectia
+elitei, mutatii, crossover).
+    Functia de merge este luata tot din laborator.
+    Pun bariera doar unde este nevoie de sincronizare. De exemplu, operatiile de selectie a elitei, mutatiile si crossover-ul pe
+care fiecare thread le face pe bucata lui, nu au nevoie de sincronizare fiindca nu modific efectiv generatia curenta.
+    Dupa cum am specificat si mai sus, argumentele fiecarui thread sunt date prin structura "thread_arg", iar array-ul <new> din 
+aceasta este folosit pentru a paraleliza mergesort-ul.
+    Structura se afla in fisierul
+
+
