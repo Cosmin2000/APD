@@ -29,9 +29,10 @@ paralel, folosindu-ma de indici, modificand si cursorul in acelasi timp.
     Aplic a doua varianta de mutatie (functia mutate_bit_string_2) pe primii 20% din indivizii in mod paralel, folosindu-ma
 tot de indici. Cresc iarasi cursorul.
     Aplic crossover intr-un punct pe primii 30% din indivizii din generatie, insa, inainte verific daca numarul de parinti
-este impar, iar daca este, pastrez ultimul individ din generatie (operatie facuta doar de thread-ul 0).
+este impar, iar daca este, pastrez ultimul individ din generatie.
     Paralelizez operatia de crossover folosindu-ma tot de indicii, insa daca indicele de start este impar,
-decrementez indicele de sfarsit pentru ca index-ul sa nu-mi depaseasca array-ul (index out of bounds).
+incrementez indicele de start pentru ca altfel un individ va fi parinte de 2 ori, si este posibil sa dea chiar si eroarea
+Index Out of Bounds pentru iteratia ultimului thread, dat fiind faptul ca se incrementeaza din 2 in 2.
     Interschimb apoi generatia curenta cu cea viitoare, operatie facuta de un singur thread.
     Pentru noua generatie curenta, ii setez corect index-ul(in mod paralel, folosind indicii), ii recalculez 
 fitness-ul (paralel folosind indicii) si o sortez paralel folosind mergesort.
@@ -54,6 +55,6 @@ elitei, mutatii, crossover).
 care fiecare thread le face pe bucata lui, nu au nevoie de sincronizare fiindca nu modific efectiv generatia curenta.
     Dupa cum am specificat si mai sus, argumentele fiecarui thread sunt date prin structura "thread_arg", iar array-ul <new> din 
 aceasta este folosit pentru a paraleliza mergesort-ul.
-    Structura se afla in fisierul
+    Structura se afla in header-ul parallel_genetic_algorithm.h
 
 

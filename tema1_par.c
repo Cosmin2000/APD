@@ -4,7 +4,6 @@
 
 void *thread_func(void *arg) {
 
-
     // Extrag datele pentru fiecare thread
     struct thread_arg* th_arg = (struct thread_arg*) arg;
     int id = th_arg->id;
@@ -83,18 +82,21 @@ void *thread_func(void *arg) {
         count = object_count * 3 / 10;
 
         // Inainte de a aplica crossover, daca numarul de parinti este impar, pastrez ultimul individ din generatie
-        if (count % 2 == 1 && id == 0) {
-			 copy_individual((*th_arg->current_generation) + object_count - 1, (*th_arg->next_generation) + cursor + count - 1);
-             count--;
+        if (count % 2 == 1) {
+            if (id == 0) {
+			    copy_individual((*th_arg->current_generation) + object_count - 1, (*th_arg->next_generation) + cursor + count - 1);
+            }
+            count--;
 		}
 
 		// Paralelizez operatia calculand indicii de start si end pentru fiecare thread.
-        // Daca indicele de start pentru un thread este impar, scad indicele de final pentru ca altfel depaseste array-ul.
 		start = id * (double)count / P;
         end = min(((id + 1) * (double)count / P), count);
-        if (start % 2 == 1) {
-            end--;
-        }
+        
+        // Daca indicele de start pentru un thread este impar, il cresc pentru ca altfel un individ va fi
+        // luat drept parinte de 2 ori. In plus, este posibil sa dea Index Out of Bounds pentru ultimul thread fiindca
+        // se incrementeaza din 2 in 2.
+        start = (start % 2 == 1) ? start + 1 : start;
 
         // Aplic crossover intr-un punct pe primii 30 % indivizi din generatia curenta (functia crossover).
         for (int i = start; i  < end ; i += 2) {
